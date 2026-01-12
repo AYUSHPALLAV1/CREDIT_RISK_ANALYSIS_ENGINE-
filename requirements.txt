@@ -1,0 +1,6 @@
+flask
+pymysql
+pandas
+numpy
+python-dotenv
+cryptography

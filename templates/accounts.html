@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .accounts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
+    .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #1e293b; display: flex; justify-content: space-between; align-items: center; }
+    .account-item { border-bottom: 1px solid #f1f5f9; padding: 10px 0; }
+    .account-item:last-child { border-bottom: none; }
+    .account-header { display: flex; justify-content: space-between; font-weight: 500; }
+    .account-meta { font-size: 0.85rem; color: #64748b; margin-top: 4px; }
+    .badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 99px; background: #e2e8f0; color: #475569; }
+    .badge.due { background: #fee2e2; color: #991b1b; }
+    .badge.ok { background: #dcfce7; color: #166534; }
+    .add-form { background: #f8fafc; padding: 15px; border-radius: 8px; margin-top: 15px; display: none; }
+    .add-form.active { display: block; }
+    .toggle-btn { font-size: 0.9rem; color: #0ea5e9; cursor: pointer; border: none; background: none; }
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: #475569; }
+    .summary-box { background: linear-gradient(135deg, #0f766e, #0d9488); color: white; padding: 20px; border-radius: 12px; margin-bottom: 24px; display: flex; justify-content: space-around; }
+    .sum-item { text-align: center; }
+    .sum-val { font-size: 1.5rem; font-weight: 700; }
+    .sum-lbl { font-size: 0.9rem; opacity: 0.9; }
+</style>
+
+<div class="summary-box">
+    <div class="sum-item">
+        <div class="sum-lbl">Total Liquidity</div>
+        <div class="sum-val">₹{{ "{:,.2f}".format(total_liquidity) }}</div>
+    </div>
+    <div class="sum-item">
+        <div class="sum-lbl">Total Debt</div>
+        <div class="sum-val">₹{{ "{:,.2f}".format(total_debt) }}</div>
+    </div>
+    <div class="sum-item">
+        <div class="sum-lbl">Net Worth</div>
+        <div class="sum-val">₹{{ "{:,.2f}".format(total_liquidity - total_debt) }}</div>
+    </div>
+</div>
+
+<div class="accounts-grid">
+    <!-- BANK ACCOUNTS -->
+    <div class="section-card">
+        <div class="section-title">
+            Bank Accounts
+            <button class="toggle-btn" onclick="toggleForm('bank-form')">+ Add New</button>
+        </div>
+        
+        <div id="bank-form" class="add-form">
+            <form action="{{ url_for('add_bank') }}" method="POST">
+                <div class="form-group"><label>Bank Name</label><input type="text" name="bank_name" required></div>
+                <div class="form-group"><label>Account Number</label><input type="text" name="account_number"></div>
+                <div class="form-group"><label>Type</label>
+                    <select name="account_type">
+                        <option>Savings</option>
+                        <option>Current</option>
+                        <option>Salary</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Current Balance</label><input type="number" step="0.01" name="balance" required></div>
+                <button type="submit" class="btn" style="width:100%">Save Account</button>
+            </form>
+        </div>
+
+        {% for bank in banks %}
+        <div class="account-item">
+            <div class="account-header">
+                <span>{{ bank.bank_name }}</span>
+                <span>₹{{ "{:,.2f}".format(bank.balance) }}</span>
+            </div>
+            <div class="account-meta">
+                {{ bank.account_type }} • {{ bank.account_number }}
+            </div>
+        </div>
+        {% else %}
+        <div class="account-meta">No bank accounts added.</div>
+        {% endfor %}
+    </div>
+
+    <!-- CREDIT CARDS -->
+    <div class="section-card">
+        <div class="section-title">
+            Credit Cards
+            <button class="toggle-btn" onclick="toggleForm('card-form')">+ Add New</button>
+        </div>
+
+        <div id="card-form" class="add-form">
+            <form action="{{ url_for('add_card') }}" method="POST">
+                <div class="form-group"><label>Bank Name</label><input type="text" name="bank_name" required></div>
+                <div class="form-group"><label>Card Name</label><input type="text" name="card_name" placeholder="e.g. Platinum"></div>
+                <div class="form-group"><label>Card Number (Last 4)</label><input type="text" name="card_number" maxlength="4"></div>
+                <div class="form-group"><label>Total Limit</label><input type="number" step="0.01" name="total_limit" required></div>
+                <div class="form-group"><label>Due Day (DD)</label><input type="number" name="due_day" min="1" max="31"></div>
+                <button type="submit" class="btn" style="width:100%">Save Card</button>
+            </form>
+        </div>
+
+        {% for card in cards %}
+        <div class="account-item">
+            <div class="account-header">
+                <span>{{ card.bank_name }} - {{ card.card_name }}</span>
+                <span style="color: #ef4444;">-₹{{ "{:,.2f}".format(card.outstanding_amount) }}</span>
+            </div>
+            <div class="account-meta">
+                Limit: ₹{{ "{:,.0f}".format(card.total_limit) }} • Due: {{ card.due_day or 'N/A' }}th
+            </div>
+            <form action="{{ url_for('update_card') }}" method="POST" style="margin-top:8px; display:flex; gap:5px;">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <input type="number" name="outstanding_amount" placeholder="Current Due" step="0.01" value="{{ card.outstanding_amount }}" style="padding:4px; font-size:0.8rem;">
+                <button type="submit" class="btn" style="padding:4px 8px; font-size:0.8rem;">Update</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="account-meta">No credit cards added.</div>
+        {% endfor %}
+    </div>
+
+    <!-- LOANS & LIABILITIES -->
+    <div class="section-card">
+        <div class="section-title">
+            Loans & EMIs
+            <button class="toggle-btn" onclick="toggleForm('loan-form')">+ Add New</button>
+        </div>
+
+        <div id="loan-form" class="add-form">
+            <form action="{{ url_for('add_loan') }}" method="POST">
+                <div class="form-group"><label>Bank / Provider</label><input type="text" name="bank_name" required></div>
+                <div class="form-group"><label>Principal Amount</label><input type="number" step="0.01" name="principal"></div>
+                <div class="form-group"><label>Monthly EMI</label><input type="number" step="0.01" name="monthly_emi" required></div>
+                <div class="form-group"><label>Due Day (DD)</label><input type="number" name="due_day" min="1" max="31"></div>
+                <div class="form-group"><label>Interest Rate (%)</label><input type="number" step="0.01" name="interest_rate"></div>
+                <button type="submit" class="btn" style="width:100%">Save Loan</button>
+            </form>
+        </div>
+
+        {% for loan in loans %}
+        <div class="account-item">
+            <div class="account-header">
+                <span>{{ loan.bank_name or 'Loan' }}</span>
+                <span style="color: #ef4444;">EMI: ₹{{ "{:,.2f}".format(loan.monthly_emi) }}</span>
+            </div>
+            <div class="account-meta">
+                Principal: ₹{{ "{:,.0f}".format(loan.principal or 0) }} • Due: {{ loan.due_day or 'N/A' }}th
+            </div>
+            {% if loan.penalty_amount > 0 or loan.overdue_days > 0 %}
+            <div class="badge due" style="display:inline-block; margin-top:4px;">
+                Overdue: {{ loan.overdue_days }} days (Penalty: ₹{{ loan.penalty_amount }})
+            </div>
+            {% endif %}
+            
+            <button class="toggle-btn" style="font-size:0.8rem; margin-top:5px;" onclick="toggleForm('loan-update-{{ loan.id }}')">Manage Penalties</button>
+            <div id="loan-update-{{ loan.id }}" class="add-form">
+                <form action="{{ url_for('update_loan') }}" method="POST">
+                    <input type="hidden" name="loan_id" value="{{ loan.id }}">
+                    <div class="form-group"><label>Overdue Days</label><input type="number" name="overdue_days" value="{{ loan.overdue_days }}"></div>
+                    <div class="form-group"><label>Penalty Amount</label><input type="number" step="0.01" name="penalty_amount" value="{{ loan.penalty_amount }}"></div>
+                    <button type="submit" class="btn" style="width:100%; font-size:0.8rem;">Update Status</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="account-meta">No loans active.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    function toggleForm(id) {
+        const el = document.getElementById(id);
+        el.classList.toggle('active');
+    }
+</script>
+{% endblock %}

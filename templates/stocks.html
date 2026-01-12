@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Management - Credit Engine</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background: #f4f4f9; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        .nav { margin-bottom: 2rem; }
+        .nav a { margin-right: 1rem; text-decoration: none; color: #007bff; }
+        .summary-box { background: #eef; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
+        .actions { display: flex; gap: 2rem; margin-bottom: 2rem; }
+        .action-card { flex: 1; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+        label { display: block; margin-top: 1rem; font-weight: bold; }
+        input, select { width: 100%; padding: 0.5rem; margin-top: 0.5rem; box-sizing: border-box; }
+        button { margin-top: 1rem; padding: 0.7rem 1.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        button.sell-btn { background: #dc3545; }
+        button.update-btn { background: #007bff; margin-top: 0; padding: 0.3rem 0.8rem; width: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; }
+        .profit { color: green; font-weight: bold; }
+        .loss { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+            <a href="{{ url_for('logout') }}" style="float: right;">Logout</a>
+        </div>
+
+        <h1>Stock Portfolio</h1>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div style="background: #ffecb3; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+                    {% for msg in messages %}{{ msg }}<br>{% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="summary-box">
+            <h2>Portfolio Summary</h2>
+            <p>Total Investment: <strong>₹{{ total_investment }}</strong></p>
+            <p>Current Value: <strong>₹{{ current_value }}</strong></p>
+            <p>Unrealized P/L: 
+                <span class="{{ 'profit' if (current_value - total_investment) >= 0 else 'loss' }}">
+                    ₹{{ current_value - total_investment }}
+                </span>
+            </p>
+        </div>
+
+        <div class="actions">
+            <!-- BUY STOCK -->
+            <div class="action-card">
+                <h3>Buy Stock</h3>
+                <form action="{{ url_for('buy_stock') }}" method="POST">
+                    <label>Ticker Symbol</label>
+                    <input type="text" name="ticker" placeholder="e.g. RELIANCE" required>
+                    
+                    <label>Quantity</label>
+                    <input type="number" name="quantity" step="0.01" min="0.01" required>
+                    
+                    <label>Price per Share (₹)</label>
+                    <input type="number" name="price" step="0.01" min="0.01" required>
+                    
+                    <button type="submit">Buy Stock</button>
+                </form>
+            </div>
+
+            <!-- SELL STOCK -->
+            <div class="action-card">
+                <h3>Sell Stock</h3>
+                <form action="{{ url_for('sell_stock') }}" method="POST">
+                    <label>Ticker Symbol</label>
+                    <select name="ticker" required>
+                        <option value="" disabled selected>Select Stock</option>
+                        {% for stock in stocks %}
+                            <option value="{{ stock.ticker }}">{{ stock.ticker }} (Qty: {{ stock.quantity }})</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <label>Quantity</label>
+                    <input type="number" name="quantity" step="0.01" min="0.01" required>
+                    
+                    <label>Selling Price per Share (₹)</label>
+                    <input type="number" name="price" step="0.01" min="0.01" required>
+                    
+                    <button type="submit" class="sell-btn">Sell Stock</button>
+                </form>
+            </div>
+        </div>
+
+        <h2>Current Holdings</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Quantity</th>
+                    <th>Avg Buy Price</th>
+                    <th>Current Price</th>
+                    <th>Current Value</th>
+                    <th>Gain/Loss</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stock in stocks %}
+                <tr>
+                    <td>{{ stock.ticker }}</td>
+                    <td>{{ stock.quantity }}</td>
+                    <td>₹{{ stock.avg_buy_price }}</td>
+                    <td>₹{{ stock.current_price }}</td>
+                    <td>₹{{ stock.quantity * stock.current_price }}</td>
+                    <td>
+                        {% set gain = (stock.current_price - stock.avg_buy_price) * stock.quantity %}
+                        <span class="{{ 'profit' if gain >= 0 else 'loss' }}">
+                            {{ "%.2f"|format(gain) }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('update_stock_price') }}" method="POST" style="display: flex; gap: 0.5rem;">
+                            <input type="hidden" name="ticker" value="{{ stock.ticker }}">
+                            <input type="number" name="new_price" placeholder="New Price" step="0.01" style="width: 80px; margin: 0; padding: 0.2rem;">
+                            <button type="submit" class="update-btn">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">No stocks found. Start investing!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

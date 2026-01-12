@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .title-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .title { font-size:22px; font-weight:700; }
+    .sub { color:#666; }
+    .stats { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+    .stat { padding:14px; border-radius:10px; background:#f8fafc; border:1px solid #eef2f7; }
+    .stat h4 { margin:0 0 6px 0; font-size:13px; color:#475569; }
+    .stat .val { font-size:22px; font-weight:700; }
+    .meter { height:8px; background:#e5e7eb; border-radius:999px; overflow:hidden; margin-top:8px; }
+    .bar { height:100%; border-radius:999px; }
+    .bar.dti { background: linear-gradient(90deg, #0ea5e9, #0369a1); }
+    .bar.sav { background: linear-gradient(90deg, #22c55e, #15803d); }
+    .layout { display:grid; grid-template-columns: 1.2fr 0.8fr; gap:16px; }
+    .section { border:1px solid #eef2f7; border-radius:10px; padding:16px; background:#fff; }
+    .section h3 { margin:0 0 10px 0; }
+    .actions { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+    .card-actions { border:1px dashed #e2e8f0; border-radius:10px; padding:12px; }
+    .hint { font-size:12px; color:#64748b; margin-top:6px; }
+  </style>
+{% endblock %}
+{% block content %}
+  <div class="title-row">
+    <div class="title">Dashboard</div>
+    <div class="sub">Welcome back</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <h4>Credit Score</h4>
+      <div class="val">{{ score }}</div>
+      <div>Risk <span class="pill {{ band }}">{{ band|capitalize }}</span></div>
+    </div>
+    <div class="stat">
+      <h4>Monthly Income</h4>
+      <div class="val">₹{{ total_income|default(0) }}</div>
+      <div class="hint">Base: ₹{{ monthly_income or 0 }}</div>
+    </div>
+    <div class="stat">
+      <h4>Monthly Expenses</h4>
+      <div class="val">₹{{ total_expenses|default(0) }}</div>
+    </div>
+    <div class="stat">
+      <h4>Monthly Savings</h4>
+      <div class="val">₹{{ savings|default(0) }}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <h4>DTI</h4>
+      <div>{{ (dti * 100)|round(1) }}%</div>
+      <div class="meter">
+        <div class="bar dti" style="width: {{ (dti * 100)|round(1) }}%;"></div>
+      </div>
+    </div>
+    <div class="stat">
+      <h4>Savings Rate</h4>
+      <div>{{ (savings_rate * 100)|round(1) }}%</div>
+      <div class="meter">
+        <div class="bar sav" style="width: {{ (savings_rate * 100)|round(1) }}%;"></div>
+      </div>
+    </div>
+    <div class="stat">
+      <h4>EMI</h4>
+      <div class="val">₹{{ total_emi|default(0) }}</div>
+      <div class="hint">Monthly burden</div>
+    </div>
+    <div class="stat">
+      <h4>Employment</h4>
+      <div class="val">{{ employment_type or '—' }}</div>
+      <div class="hint">Age {{ age or '—' }}</div>
+    </div>
+  </div>
+
+  <div class="layout" style="margin-top:12px;">
+    <div class="section">
+      <h3>Income vs Expenses</h3>
+      <canvas id="ieChart" height="160"></canvas>
+      <div style="margin-top:8px;">Income: ₹{{ total_income }} · Expenses: ₹{{ total_expenses }}</div>
+      <div>Savings: ₹{{ savings }}</div>
+    </div>
+    <div class="section">
+      <h3>Portfolio & EMI</h3>
+      <div>Total monthly EMI: ₹{{ total_emi }}</div>
+      <div style="margin-top: 12px; display: flex; gap: 8px;">
+        <a href="{{ url_for('view_stocks') }}" class="btn" style="text-decoration: none; flex: 1; text-align: center;">Manage Stocks</a>
+        <a href="{{ url_for('view_accounts') }}" class="btn" style="text-decoration: none; flex: 1; text-align: center; background-color: #0f766e;">Accounts & Liabilities</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions" style="margin-top:12px;">
+    <div class="card-actions">
+      <h3>Add Income</h3>
+      <form method="post" action="{{ url_for('add_income') }}">
+        <label>Amount (₹)</label>
+        <input name="amount" type="number" step="0.01" required />
+        <label>Category</label>
+        <select name="category">
+          <option>Salary</option>
+          <option>Bonus</option>
+          <option>Other</option>
+        </select>
+        <div style="margin-top:8px;"><button class="btn" type="submit">Add</button></div>
+      </form>
+    </div>
+    <div class="card-actions">
+      <h3>Add Expense</h3>
+      <form method="post" action="{{ url_for('add_expense') }}">
+        <label>Amount (₹)</label>
+        <input name="amount" type="number" step="0.01" required />
+        <label>Category</label>
+        <select name="category">
+          <option>Food</option>
+          <option>Rent</option>
+          <option>EMI</option>
+          <option>Travel</option>
+          <option>Other</option>
+        </select>
+        <div style="margin-top:8px;"><button class="btn" type="submit">Add</button></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const ctx = document.getElementById('ieChart');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Income', 'Expenses', 'EMI'],
+        datasets: [{
+          label: '₹',
+          data: [{{ total_income|default(0) }}, {{ total_expenses|default(0) }}, {{ total_emi|default(0) }}],
+          backgroundColor: ['#22c55e', '#ef4444', '#0ea5e9']
+        }]
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  </script>
+{% endblock %}
